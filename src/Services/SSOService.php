@@ -13,7 +13,6 @@ class SSOService
 
     public function __construct()
     {
-        // Initialize the state if it doesn't exist
         if (!Session::has('_sso_state')) {
             $this->state = bin2hex(random_bytes(16));
             Session::put('_sso_state', $this->state);
@@ -77,8 +76,15 @@ class SSOService
         return $loginUrl;
     }
 
-    public function authenticate($code)
+    public function authenticate($code, $state)
     {
+        if ($state !== Session::get('_sso_state')) {
+            return [
+                'success' => false,
+                'message' => 'Invalid state parameter. Potential CSRF attack.'
+            ];
+        }
+
         try {
             $config = $this->getKeycloakConfig();
             $tokenUrl = $this->getBaseUrl() . '/realms/' . $config['realm'] . '/protocol/openid-connect/token';
@@ -96,21 +102,51 @@ class SSOService
                 Session::put('access_token', $response['access_token']);
                 Session::put('refresh_token', $response['refresh_token']);
                 $this->log("Authentication successful for code: $code");
-                return true;
+
+                $userInfo = $this->getUserInfo();
+                Session::put('user', $userInfo);
+                
+                Session::forget('_sso_state');
+
+                return [
+                    'success' => true,
+                    'user' => $userInfo
+                ];
             }
 
             $this->log("Authentication failed for code: $code", 'error');
-            return false;
+            return [
+                'success' => false,
+                'message' => 'Authentication failed. No access token received.'
+            ];
 
         } catch (Exception $e) {
             $this->log("Exception during authentication: " . $e->getMessage(), 'error');
-            throw $e;
+            return [
+                'success' => false,
+                'message' => $e->getMessage()
+            ];
         }
+    }
+
+
+    public function getUserInfo()
+    {
+        $userinfoUrl = $this->getBaseUrl() . '/realms/' . $this->getKeycloakConfig()['realm'] . '/protocol/openid-connect/userinfo';
+        $accessToken = $this->getAccessToken();
+        $response = $this->httpGet($userinfoUrl, $accessToken);
+        
+        if (isset($response['error'])) {
+            $this->log('Error fetching user profile: ' . $response['error']);
+            return null; 
+        }
+
+        return $response;
     }
 
     public function logout()
     {
-        Session::flush(); // Clear all session data
+        Session::flush(); 
 
         $config = $this->getKeycloakConfig();
         $logoutUrl = $this->getBaseUrl() . '/realms/' . $config['realm'] . '/protocol/openid-connect/logout?' . http_build_query([
@@ -132,12 +168,6 @@ class SSOService
         return $this->getAccessToken() && $this->introspectToken($this->getAccessToken());
     }
 
-    /**
-     * Introspect the access token to check its validity.
-     *
-     * @param string $token
-     * @return bool
-     */
     public function introspectToken($token)
     {
         try {
@@ -152,6 +182,25 @@ class SSOService
         } catch (Exception $e) {
             $this->log("Exception during token introspection: " . $e->getMessage(), 'error');
             return false;
+        }
+    }
+
+    protected function httpGet($url, $accessToken)
+    {
+        try {
+            $response = Http::withToken($accessToken)->get($url);
+
+            $this->log("HTTP GET request to $url with status: " . $response->status());
+
+            if ($response->successful()) {
+                return $response->json();
+            } else {
+                $this->log('Error fetching user profile: ' . $response->body());
+                return ['error' => 'Unable to fetch user profile'];
+            }
+        } catch (Exception $e) {
+            $this->log('Exception during HTTP GET: ' . $e->getMessage());
+            throw new \Exception("HTTP GET error: " . $e->getMessage());
         }
     }
 

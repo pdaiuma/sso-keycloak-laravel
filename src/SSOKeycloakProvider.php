@@ -16,6 +16,6 @@ class SSOKeycloakProvider extends ServiceProvider
 
     public function boot()
     {
-        
+        $this->app->alias('sso-keycloak', SSOService::class);
     }
 }
