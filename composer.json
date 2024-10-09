@@ -1,0 +1,33 @@
+{
+    "name": "pdaiuma/sso-keycloak-laravel",
+    "description": "A very simple Laravel package for integrating with Keycloak SSO using the OpenID Connect protocol.",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "PDAI",
+            "email": "pdai@uma.ac.id"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "PDAIUMA\\SSOKeycloak\\": "src/"
+        }
+    },
+    "require": {
+        "php": "^7.2|^8.0",
+        "illuminate/support": "5.*|6.*|7.*|8.*|9.*|10.*"
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "extra": {
+        "laravel": {
+            "providers": [
+                "PDAIUMA\\SSOKeycloak\\SSOKeycloakProvider"
+            ],
+            "aliases": {
+                "SSOKeycloak": "PDAIUMA\\SSOKeycloak\\Facades\\SSOKeycloak"
+            }
+        }
+    }
+}
