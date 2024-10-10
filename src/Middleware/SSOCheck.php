@@ -17,15 +17,10 @@ class SSOCheck
 
     public function handle($request, Closure $next)
     {
-        if (!Session::has('access_token')) {
-            return redirect()->route('login');
+        if (Session::has('access_token') && $this->ssoService->introspectToken(Session::get('access_token'))) {
+            return $next($request);
         }
 
-        $accessToken = Session::get('access_token');
-        if (!$this->ssoService->introspectToken($accessToken)) {
-            return redirect()->route('login');
-        }
-
-        return $next($request);
+        return redirect()->route('login');
     }
 }
