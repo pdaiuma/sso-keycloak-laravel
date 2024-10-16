@@ -20,7 +20,7 @@ class SSOCheck
         if (Session::has('access_token') && $this->ssoService->introspectToken(Session::get('access_token'))) {
             return $next($request);
         }
-
+        Session::flush();
         return redirect()->route('login');
     }
 }
