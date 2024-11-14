@@ -5,17 +5,19 @@ namespace PDAIUMA\SSOKeycloak\Services;
 use Exception;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
-use Illuminate\Support\Facades\Http;
+use GuzzleHttp\Client as GuzzleClient; // Use Guzzle client
 
 class SSOService
 {
     private $state;
     private $config;
+    private $httpClient;
 
     public function __construct()
     {
         $this->config = $this->getKeycloakConfig();
         $this->initializeState();
+        $this->httpClient = new GuzzleClient(); // Initialize Guzzle client
     }
 
     /**
@@ -217,7 +219,7 @@ class SSOService
      */
     protected function httpGet($url, $accessToken)
     {
-        return Http::withToken($accessToken)->get($url)->json();
+        return $this->makeHttpRequest('get', $url, $accessToken);
     }
 
     /**
@@ -225,7 +227,29 @@ class SSOService
      */
     private function httpPost($url, $data)
     {
-        return Http::asForm()->post($url, $data)->json();
+        return $this->makeHttpRequest('post', $url, $data);
+    }
+
+    /**
+     * General method for making HTTP requests with Guzzle.
+     */
+    private function makeHttpRequest($method, $url, $data = null)
+    {
+        try {
+            $options = [];
+
+            if ($method === 'post') {
+                $options['form_params'] = $data;
+            } elseif ($method === 'get') {
+                $options['headers'] = ['Authorization' => 'Bearer ' . $data]; // Token for GET requests
+            }
+
+            $response = $this->httpClient->request(strtoupper($method), $url, $options);
+
+            return json_decode($response->getBody()->getContents(), true);
+        } catch (Exception $e) {
+            return $this->exceptionResponse($e);
+        }
     }
 
     /**
