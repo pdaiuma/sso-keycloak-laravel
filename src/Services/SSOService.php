@@ -154,12 +154,16 @@ class SSOService
      */
     public function logout()
     {
-        Session::flush();
-
         $config = $this->getKeycloakConfig();
+        $idToken = session('id_token');
+        Session::flush();
         $logoutUrl = $this->getBaseUrl() . '/realms/' . $config['realm'] . '/protocol/openid-connect/logout?' . http_build_query([
             'client_id' => $config['client_id'],
         ]);
+
+        if ($idToken) {
+            $logoutUrl .= '&id_token_hint=' . urlencode($idToken);
+        }
 
         if (!headers_sent()) {
             header('Location: ' . $logoutUrl);
@@ -167,6 +171,7 @@ class SSOService
         } else {
             throw new \Exception('Headers already sent. Unable to perform logout redirect.');
         }
+
     }
 
     /**
@@ -212,6 +217,7 @@ class SSOService
     {
         Session::put('access_token', $response['access_token']);
         Session::put('refresh_token', $response['refresh_token']);
+        Session::put('id_token', $response['id_token']);
     }
 
     /**
