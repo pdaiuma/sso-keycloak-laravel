@@ -20,6 +20,11 @@ class SSOCheck
         if (Session::has('access_token') && $this->ssoService->introspectToken(Session::get('access_token'))) {
             return $next($request);
         }
+
+        if (Session::has('temp_role')) {
+            return redirect()->route('login');
+        }
+
         Session::flush();
         return redirect()->route('login');
     }
